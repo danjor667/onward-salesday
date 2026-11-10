@@ -1,0 +1,22 @@
+# GitSync deployment file for stack onward-dev-salesday.
+# Changing this file or the template, and merging to main, updates the stack.
+template-file-path: infra/template.yaml
+
+parameters:
+  Environment: dev
+  Purpose: salesday
+  Owner: Jordan Steve
+  GitHubOwner: danjor667
+  RepositoryName: onward-salesday
+  # Git tag, branch or commit the servers install. Prefer a tag.
+  AppVersion: main
+  InstanceType: t3.micro
+  CpuCredits: unlimited
+  MinServers: '2'
+  MaxServers: '6'
+  CpuTargetPercent: '50'
+
+tags:
+  Project: onward
+  Owner: Jordan Steve
+  Environment: dev

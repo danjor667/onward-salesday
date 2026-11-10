@@ -1,0 +1,546 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Onward Logistics order system - sales day capacity. A public load balancer
+  in front of private EC2 servers that grow and shrink with demand, across
+  two Availability Zones, with outbound internet through a Regional NAT
+  Gateway and no admin ports.
+
+# Reading order:
+#   1. Network          VPC, public subnets (load balancer), private subnets (servers)
+#   2. Outbound access  Regional NAT Gateway
+#   3. Security groups  who may talk to whom
+#   4. Load balancer    the single public entry point
+#   5. Servers          role, launch template (how a server builds itself)
+#   6. Auto Scaling     how many servers, and what changes that number
+#   7. Load test        a secure way to simulate a sales day
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, test, prod]
+  Purpose:
+    Type: String
+    Default: salesday
+  Owner:
+    Type: String
+    Description: Value of the Owner tag, and the name shown on the page.
+  LabName:
+    Type: String
+    Default: Handling Sales Day Demand for the Onward Logistics Order System
+  VpcCidr:
+    Type: String
+    Default: 10.30.0.0/16
+  PublicIngressCidr:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: Who may reach the load balancer on port 80.
+
+  # ---- Application ----
+  GitHubOwner:
+    Type: String
+    Description: Owner of the public GitHub repository each server installs the application from.
+  RepositoryName:
+    Type: String
+  AppVersion:
+    Type: String
+    Default: main
+    Description: >-
+      Git tag, branch or commit to install. Changing it replaces the servers
+      one at a time with the new version. Prefer a tag, so every server runs
+      the same code.
+
+  # ---- Servers ----
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small, t2.micro]
+    Description: Free Tier eligible sizes. Check with "aws ec2 describe-instance-types --filters Name=free-tier-eligible,Values=true".
+  CpuCredits:
+    Type: String
+    Default: unlimited
+    AllowedValues: [unlimited, standard]
+    Description: >-
+      unlimited lets a busy server keep full speed for a small extra charge.
+      standard never costs extra but slows a server to 10% once its credits
+      run out, which defeats scaling on CPU. See docs/decisions.md.
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Description: Amazon Linux 2023, resolved to the current image each time the stack is updated.
+  MinServers:
+    Type: Number
+    Default: 2
+    MinValue: 2
+    Description: The lean size. Never fewer than two, so there is one server per Availability Zone.
+  MaxServers:
+    Type: Number
+    Default: 6
+    Description: The peak size. Also the upper limit on what the servers can cost.
+  CpuTargetPercent:
+    Type: Number
+    Default: 50
+    Description: Servers are added when average CPU rises above this, and removed when it falls well below.
+
+Mappings:
+  App:
+    Settings:
+      Port: 8080
+
+Resources:
+  # ============================================================ 1. Network ==
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-vpc'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-igw'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public subnets hold the load balancer and nothing else.
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 4, 8]]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-public-a'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 4, 8]]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-public-b'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-public'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  # Private subnets hold the servers. They get no public IP address and the
+  # route table has no route to the internet gateway, so nothing on the
+  # internet can start a connection to them.
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !GetAZs '']
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 4, 8]]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-private-a'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !GetAZs '']
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 4, 8]]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-private-b'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-private'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  # ==================================================== 2. Outbound access ==
+  # A Regional NAT Gateway is one gateway that serves every Availability
+  # Zone the servers run in, and manages its own public addresses. It lets
+  # servers start connections out (to download packages and reach AWS
+  # Systems Manager) but accepts none coming in. It needs no public subnet.
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityMode: regional
+      ConnectivityType: public
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-nat'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  # One route for both private subnets: that is the point of "regional".
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
+
+  # ==================================================== 3. Security groups ==
+  # Traffic chain: internet -> load balancer -> servers. There is no rule
+  # for SSH (port 22) or any other admin port anywhere.
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 'onward-${Environment}-${Purpose}-alb'
+      GroupDescription: Public entry point. HTTP in from customers, out only to the servers.
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - Description: HTTP from customers and merchants
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: !Ref PublicIngressCidr
+      SecurityGroupEgress:
+        - Description: To the application on the servers only
+          IpProtocol: tcp
+          FromPort: !FindInMap [App, Settings, Port]
+          ToPort: !FindInMap [App, Settings, Port]
+          DestinationSecurityGroupId: !Ref ServerSecurityGroup
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-alb'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  ServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub 'onward-${Environment}-${Purpose}-server'
+      GroupDescription: Application servers. In from the load balancer only, out over HTTPS only.
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - Description: HTTPS out through the NAT gateway (packages, updates, Systems Manager)
+          IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-server'}
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  # Separate resource (not inline) to avoid a circular reference between the
+  # two groups.
+  ServerIngressFromLoadBalancer:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ServerSecurityGroup
+      Description: Application port from the load balancer only
+      IpProtocol: tcp
+      FromPort: !FindInMap [App, Settings, Port]
+      ToPort: !FindInMap [App, Settings, Port]
+      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+
+  # ====================================================== 4. Load balancer ==
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub 'onward-${Environment}-${Purpose}'
+      Type: application
+      Scheme: internet-facing
+      Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
+      SecurityGroups: [!Ref LoadBalancerSecurityGroup]
+      LoadBalancerAttributes:
+        - {Key: routing.http.drop_invalid_header_fields.enabled, Value: 'true'}
+        - {Key: idle_timeout.timeout_seconds, Value: '60'}
+      Tags:
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  # The list of servers currently able to take requests. The Auto Scaling
+  # group adds and removes servers here by itself. Stickiness is off, so
+  # refreshing the page shows different servers answering.
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub 'onward-${Environment}-${Purpose}'
+      VpcId: !Ref Vpc
+      TargetType: instance
+      Protocol: HTTP
+      Port: !FindInMap [App, Settings, Port]
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 10
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher: {HttpCode: '200'}
+      TargetGroupAttributes:
+        # How long in-flight requests get to finish before a server is removed.
+        - {Key: deregistration_delay.timeout_seconds, Value: '30'}
+      Tags:
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+
+  # ============================================================ 5. Servers ==
+  # The only permission a server has: to be managed through AWS Systems
+  # Manager. That is how engineers open a shell (Session Manager) and how
+  # the load test runs, without SSH keys or open ports.
+  ServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'onward-${Environment}-${Purpose}-server'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+      Tags:
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  ServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub 'onward-${Environment}-${Purpose}-server'
+      Roles: [!Ref ServerRole]
+
+  # The recipe for a server. Every server the group launches is built from
+  # this, with no one logging in.
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub 'onward-${Environment}-${Purpose}'
+      TagSpecifications:
+        - ResourceType: launch-template
+          Tags:
+            - {Key: Project, Value: onward}
+            - {Key: Owner, Value: !Ref Owner}
+            - {Key: Environment, Value: !Ref Environment}
+      LaunchTemplateData:
+        ImageId: !Ref LatestAmiId
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile:
+          Arn: !GetAtt ServerInstanceProfile.Arn
+        SecurityGroupIds: [!Ref ServerSecurityGroup]
+        # No KeyName: there is no SSH key, so there is nothing to leak.
+        CreditSpecification:
+          CpuCredits: !Ref CpuCredits
+        Monitoring:
+          Enabled: true   # CPU reported every minute instead of every five, so scaling reacts sooner
+        MetadataOptions:
+          HttpEndpoint: enabled
+          HttpTokens: required          # IMDSv2 only
+          HttpPutResponseHopLimit: 1
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 8
+              VolumeType: gp3
+              Encrypted: true
+              DeleteOnTermination: true
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}'}
+              - {Key: Project, Value: onward}
+              - {Key: Owner, Value: !Ref Owner}
+              - {Key: Environment, Value: !Ref Environment}
+          - ResourceType: volume
+            Tags:
+              - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}'}
+              - {Key: Project, Value: onward}
+              - {Key: Owner, Value: !Ref Owner}
+              - {Key: Environment, Value: !Ref Environment}
+        # Runs once, as root, on first boot: fetch this repository at the
+        # chosen version and hand over to scripts/install.sh, which installs
+        # and starts the application. Output: /var/log/cloud-init-output.log
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euo pipefail
+            mkdir -p /opt/onward
+            curl -fsSL --retry 8 --retry-delay 5 --retry-all-errors \
+              "https://github.com/${GitHubOwner}/${RepositoryName}/archive/${AppVersion}.tar.gz" \
+              | tar -xz -C /opt/onward --strip-components=1
+            export OWNER_NAME='${Owner}'
+            export LAB_NAME='${LabName}'
+            export APP_VERSION='${AppVersion}'
+            bash /opt/onward/scripts/install.sh
+
+  # ======================================================= 6. Auto Scaling ==
+  ServerGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    # Servers need the outbound route to install the application.
+    DependsOn: [PrivateDefaultRoute, PrivateSubnetARouteTableAssociation, PrivateSubnetBRouteTableAssociation]
+    # When the launch template changes (new application version, new image),
+    # replace servers one at a time and never drop below the lean size.
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: !Ref MinServers
+        MaxBatchSize: 1
+        PauseTime: PT3M
+        SuspendProcesses: [AlarmNotification, AZRebalance, ScheduledActions]
+    Properties:
+      AutoScalingGroupName: !Sub 'onward-${Environment}-${Purpose}'
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      # Two zones. The group keeps servers balanced across them, so losing
+      # a zone leaves servers running in the other and the group replaces
+      # the lost ones there.
+      VPCZoneIdentifier: [!Ref PrivateSubnetA, !Ref PrivateSubnetB]
+      MinSize: !Ref MinServers
+      MaxSize: !Ref MaxServers
+      # DesiredCapacity is deliberately not set: the scaling policy owns it.
+      TargetGroupARNs: [!Ref TargetGroup]
+      # Use the load balancer's health check, not just "is the machine on":
+      # a server whose application stops answering is replaced.
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300    # time for a new server to install and start the application
+      DefaultInstanceWarmup: 180     # a new server's CPU is ignored until it has settled
+      MetricsCollection:
+        - Granularity: 1Minute
+      Tags:
+        - {Key: Project, Value: onward, PropagateAtLaunch: true}
+        - {Key: Owner, Value: !Ref Owner, PropagateAtLaunch: true}
+        - {Key: Environment, Value: !Ref Environment, PropagateAtLaunch: true}
+
+  # Target tracking works like a thermostat: keep average CPU across the
+  # group near the target. Above it, add servers; well below it for about
+  # fifteen minutes, remove them. It creates and manages its own alarms.
+  CpuScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref ServerGroup
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: !Ref CpuTargetPercent
+
+  # ========================================================== 7. Load test ==
+  # Makes every CPU core busy for a set time, to simulate a sales day.
+  # Run it with scripts/load-test.sh. It is a Systems Manager command: only
+  # someone with AWS credentials allowed to run it can start it, each run is
+  # recorded in CloudTrail, and no port is opened. Nothing about it is
+  # reachable from the public page.
+  LoadTestDocument:
+    Type: AWS::SSM::Document
+    Properties:
+      Name: !Sub 'onward-${Environment}-${Purpose}-load'
+      DocumentType: Command
+      DocumentFormat: YAML
+      TargetType: /AWS::EC2::Instance
+      UpdateMethod: NewVersion
+      Content:
+        schemaVersion: '2.2'
+        description: Simulate sales day demand by keeping every CPU core busy for a set time.
+        parameters:
+          DurationSeconds:
+            type: String
+            description: How long to stay busy, in seconds (up to 3600).
+            default: '600'
+            allowedPattern: '^([1-9][0-9]{0,2}|[1-2][0-9]{3}|3[0-5][0-9]{2}|3600)$'
+        mainSteps:
+          - action: aws:runShellScript
+            name: busyCpu
+            inputs:
+              timeoutSeconds: '3700'
+              runCommand:
+                - 'for core in $(seq "$(nproc)"); do timeout {{ DurationSeconds }} sh -c "while :; do :; done" & done'
+                - 'wait'
+                - 'exit 0'
+      Tags:
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+Outputs:
+  ApplicationUrl:
+    Description: The single public address of the order system.
+    Value: !Sub 'http://${LoadBalancer.DNSName}'
+  ServerGroupName:
+    Value: !Ref ServerGroup
+  LoadTestDocumentName:
+    Value: !Ref LoadTestDocument

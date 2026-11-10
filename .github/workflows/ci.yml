@@ -1,0 +1,40 @@
+# Checks the application and the templates before they can reach main.
+# GitSync deploys whatever is on main, so this is the gate.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'   # the version installed on the servers
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
+      - run: bash -n scripts/install.sh scripts/load-test.sh
+
+  templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install cfn-lint
+      - run: cfn-lint
+      - name: No inline IAM policies
+        run: |
+          if grep -rnE '^\s*Policies:|AWS::IAM::Policy\b' infra bootstrap; then
+            echo "Inline IAM policies are not allowed. Use AWS::IAM::ManagedPolicy."
+            exit 1
+          fi

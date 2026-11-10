@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Onward Logistics Orders</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <p class="brand">Onward Logistics</p>
+    <h1>{{ owner_name }}</h1>
+    <p class="lab">{{ lab_name }}</p>
+    <p class="server">Answered by server <strong>{{ runtime.server }}</strong> in zone <strong>{{ runtime.zone }}</strong></p>
+  </header>
+
+  <main>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+    <section>
+      <h2>New order</h2>
+      <form method="post" action="{{ url_for('orders.create_order') }}">
+        <label>Merchant <input name="merchant" required maxlength="100"></label>
+        <label>Customer <input name="customer" required maxlength="100"></label>
+        <label>Destination <input name="destination" required maxlength="100"></label>
+        <button type="submit">Create order</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>Orders</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Merchant</th><th>Customer</th><th>Destination</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+            <tr>
+              <td>{{ order.id }}</td>
+              <td>{{ order.merchant }}</td>
+              <td>{{ order.customer }}</td>
+              <td>{{ order.destination }}</td>
+              <td><span class="status status-{{ order.status }}">{{ order.status.replace('_', ' ') }}</span></td>
+              <td>
+                {% if order.next_status %}
+                <form method="post" action="{{ url_for('orders.advance_order', order_id=order.id) }}">
+                  <button type="submit" class="small">Mark {{ order.next_status.replace('_', ' ') }}</button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No orders yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Version <code>{{ version }}</code> · server <code>{{ runtime.server }}</code> · zone <code>{{ runtime.zone }}</code>
+  </footer>
+</body>
+</html>
