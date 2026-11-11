@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Onward Logistics · Parcels delivered, tracked every step{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <h1>Parcels delivered across West Africa, tracked every step.</h1>
+    <p>Book a pickup in a minute, see the price before you pay, and share one code your customer can follow.</p>
+    <a class="button" href="{{ url_for('customer.new_order') }}">Send a parcel</a>
+  </div>
+
+  <form id="track" class="card track" method="get" action="{{ url_for('customer.track') }}">
+    <h2>Track a parcel</h2>
+    {% if track_error %}<p class="error" role="alert">{{ track_error }}</p>{% endif %}
+    <label>Tracking code
+      <input name="code" required maxlength="20" placeholder="ONW-XXXXXX" autocapitalize="characters" autocomplete="off">
+    </label>
+    <button type="submit" class="secondary">Track</button>
+    <p class="hint">Try <a href="{{ url_for('customer.show_order', code='ONW-DEMO01') }}">ONW-DEMO01</a> to see a parcel on its way.</p>
+  </form>
+</section>
+
+{% if recent %}
+<section>
+  <h2>Your recent orders</h2>
+  <ul class="recent">
+    {% for order in recent %}
+    <li>
+      <a href="{{ url_for('customer.show_order', code=order.code) }}">
+        <strong>{{ order.code }}</strong>
+        <span>{{ order.pickup_city|city }} → {{ order.delivery_city|city }} · {{ order.recipient_name }}</span>
+        <span class="status status-{{ order.status }}">{{ status_text[order.status][0] }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section>
+  <h2>How it works</h2>
+  <ol class="steps-explained">
+    <li><strong>Book</strong><span>Tell us where to collect and where to deliver. You see the price straight away.</span></li>
+    <li><strong>We collect</strong><span>A rider picks the parcel up from your door or shop.</span></li>
+    <li><strong>Track</strong><span>You and your customer follow the parcel with one tracking code.</span></li>
+  </ol>
+</section>
+
+<section>
+  <h2>Prices</h2>
+  <div class="table-wrap">
+    <table class="prices">
+      <thead>
+        <tr><th>Route</th>{% for key, (label, limit, _) in sizes.items() %}<th>{{ label }} <small>{{ limit }}</small></th>{% endfor %}<th>Standard</th><th>Express</th></tr>
+      </thead>
+      <tbody>
+        {% for key, route in routes.items() %}
+        <tr>
+          <td>{{ route.label }}</td>
+          {% for size_key, (_, _, percent) in sizes.items() %}<td>{{ (route.base_cents * percent // 100)|money }}</td>{% endfor %}
+          <td>{{ route.standard_hours // 24 }} day{{ '' if route.standard_hours == 24 else 's' }}</td>
+          <td>{% if route.express_hours < 24 %}{{ route.express_hours }} hours{% else %}{{ route.express_hours // 24 }} day{{ '' if route.express_hours == 24 else 's' }}{% endif %}, +50%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

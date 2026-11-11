@@ -1,7 +1,7 @@
 # onward-salesday
 
-The Onward Logistics order system on servers that grow and shrink with
-demand. On a sales day, order volume triples within hours: this setup adds
+The Onward Logistics order system, where customers book and track parcel
+deliveries, on servers that grow and shrink with demand. On a sales day, order volume triples within hours: this setup adds
 servers by itself when they get busy and removes them when the rush is over.
 
 One repository holds both the application and its infrastructure. A push to
@@ -26,6 +26,7 @@ flowchart TB
 
   ALB -->|8080, health checked| ASG
   ASG -->|HTTPS out| NAT --> NET((Internet:<br/>packages, GitHub, Systems Manager))
+  ASG -->|orders| DDB[(DynamoDB orders table<br/>shared by all servers)]
   CW[CloudWatch: average CPU] -->|above 50%: add<br/>well below: remove| ASG
   ENG[Engineer with AWS credentials] -->|Systems Manager,<br/>no SSH, no open port| ASG
 ```
@@ -35,7 +36,8 @@ flowchart TB
 - **The Auto Scaling group** keeps between two and six servers running, spread over two zones. It replaces any server that fails its health check.
 - **A scaling policy** watches average CPU. Above 50% it adds servers; when CPU stays low it removes them.
 - **Each server builds itself** at launch: it downloads this repository and runs `scripts/install.sh`. Nobody logs in.
-- **The page shows which server answered** (instance ID and zone), so you can watch requests spread as servers come and go.
+- **Every page shows which server answered** (instance ID and zone), so you can watch requests spread as servers come and go.
+- **Orders live in one DynamoDB table** shared by all servers, so an order placed through one server is found by every other, including servers that did not exist when it was placed.
 
 ## What is in this repository
 
@@ -44,12 +46,54 @@ flowchart TB
 | `infra/template.yaml` | The whole infrastructure, in seven numbered sections |
 | `infra/deployments/dev.yaml` | GitSync deployment file: parameters and tags for the `dev` stack |
 | `bootstrap/` | The two templates that switch GitSync on. Deployed once from a terminal |
-| `app/` | The order application: `orders.py` (logic), `routes.py` (pages and API), `runtime.py` (which server am I) |
+| `app/` | The order application (see below) |
 | `scripts/install.sh` | Run by every new server to install and start the application |
 | `scripts/load-test.sh` | Simulates a sales day, securely |
 | `tests/` | Application tests |
 | `docs/decisions.md` | Each design decision, its reason, and what was rejected |
 | `docs/cost.md` | What the design costs on a quiet day and on a peak day |
+
+### Inside `app/`
+
+| Path | What it is |
+|---|---|
+| `app/pricing.py` | What a delivery costs and how long it takes: route × parcel size × speed |
+| `app/orders.py` | The rules for placing, moving and cancelling an order |
+| `app/store.py` | Where orders are kept: in memory locally, in DynamoDB on AWS |
+| `app/stats.py` | Numbers and search for the operations dashboard |
+| `app/security.py` | Form tokens and the staff passcode |
+| `app/runtime.py` | Which container or server answered, shown on every page |
+| `app/web/` | The pages: `customer.py` (book, track, cancel), `ops.py` (staff dashboard), `api.py` (JSON API and `/health`) |
+| `app/templates/`, `app/static/` | The user interface |
+| `tests/` | Tests for each of the above. DynamoDB is simulated, so no AWS account is needed |
+
+## What the application does
+
+**Customers and merchants**
+
+- Book a delivery in three steps: route, parcel, people. The price updates as they choose.
+- Get a tracking code (for example `ONW-7KQ2MX`) and follow the parcel on a timeline, with an estimated delivery time.
+- Cancel an order until a rider has picked it up.
+- See their recent orders on the home page.
+
+**Riders and staff** (the *Operations* link, behind a passcode)
+
+- A dashboard: orders in progress, placed and delivered today, revenue, orders by status.
+- Search and filter orders, move a parcel to its next step, cancel an order.
+
+Two sample orders always exist, `ONW-DEMO01` and `ONW-DEMO02`, so tracking can be shown straight away.
+
+### The staff passcode
+
+- **Locally** it is `onward-local` (or the `STAFF_PASSCODE` environment variable).
+- **On AWS** it is generated the first time the application starts and kept in the orders table, so it is never in this repository. Read it with AWS credentials:
+
+  ```bash
+  aws dynamodb get-item --table-name onward-dev-salesday \
+    --key '{"pk":{"S":"CONFIG"}}' --query Item.staff_passcode.S --output text
+  ```
+
+  To change it, delete that item and restart the application.
 
 ## Changing something
 
@@ -69,6 +113,8 @@ pip install -r requirements-dev.txt
 pytest
 flask --app wsgi run --port 8080
 ```
+
+Locally, orders are kept in memory and are lost when the application stops.
 
 ## Building from scratch
 
@@ -132,7 +178,7 @@ URL=$(aws cloudformation describe-stacks --stack-name onward-dev-salesday \
 | Check | How to show it |
 |---|---|
 | One public address, stays reachable | Open `$URL`. Keep `while true; do curl -s -o /dev/null -w "%{http_code}\n" $URL; sleep 1; done` running through the other checks |
-| Requests shared, page shows the server | `for i in $(seq 8); do curl -s $URL/health; echo; done` shows different `server` values. The page header shows the same |
+| Requests shared, page shows the server | `for i in $(seq 8); do curl -s $URL/health; echo; done` shows different `answered_by` values. The footer of every page shows the same. Place an order, then refresh its tracking page: different servers answer, and each one finds the order |
 | Grows under demand, shrinks afterwards | `scripts/load-test.sh 600`. Servers are added within about three to five minutes. Roughly fifteen minutes after the load ends they are removed |
 | Failed server is replaced | `aws ec2 terminate-instances --instance-ids <id>`: the page keeps answering and a new server appears |
 | Survives the loss of a zone | Servers run in two zones (shown on the page). Terminate every server in one zone: the other zone keeps answering while replacements start |
@@ -143,7 +189,7 @@ URL=$(aws cloudformation describe-stacks --stack-name onward-dev-salesday \
 
 ## Removing everything
 
-1. Delete the `onward-dev-salesday` stack.
+1. Delete the `onward-dev-salesday` stack. This also deletes the orders table and its orders.
 2. Delete `onward-dev-salesday-gitsync`, then `onward-dev-salesday-connection`.
 
 Do not push to `main` between steps 1 and 2: GitSync would create the stack again.

@@ -3,7 +3,8 @@
 # Run as root by the launch template's user data, after the repository has
 # been unpacked into /opt/onward. Nobody logs in to run this.
 #
-# Expects in the environment: OWNER_NAME, LAB_NAME, APP_VERSION.
+# Expects in the environment: OWNER_NAME, LAB_NAME, APP_VERSION,
+# ORDERS_TABLE, AWS_DEFAULT_REGION.
 set -euo pipefail
 
 APP_DIR=/opt/onward
@@ -24,6 +25,8 @@ cat > /etc/onward/app.env <<ENV
 OWNER_NAME=${OWNER_NAME}
 LAB_NAME=${LAB_NAME}
 APP_VERSION=${APP_VERSION}
+ORDERS_TABLE=${ORDERS_TABLE}
+AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
 ENV
 
 # systemd starts the application now, on every boot, and again if it crashes.

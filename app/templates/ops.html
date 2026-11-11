@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Operations · Onward Logistics{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Operations</h1>
+  <form method="post" action="{{ url_for('ops.logout') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="secondary small">Sign out</button>
+  </form>
+</div>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<ul class="tiles">
+  <li><span>In progress</span><strong>{{ summary.active }}</strong></li>
+  <li><span>Placed today</span><strong>{{ summary.placed_today }}</strong></li>
+  <li><span>Delivered today</span><strong>{{ summary.delivered_today }}</strong></li>
+  <li><span>Revenue today</span><strong>{{ summary.revenue_today_cents|money }}</strong></li>
+  <li><span>Revenue, all orders</span><strong>{{ summary.revenue_cents|money }}</strong></li>
+</ul>
+
+<section class="card">
+  <h2>By status</h2>
+  <ul class="bars">
+    {% for key, count in summary.by_status.items() %}
+    <li>
+      <a href="{{ url_for('ops.dashboard', status=key) }}">{{ status_text[key][0] }}</a>
+      <span class="bar-track"><span class="bar-fill status-{{ key }}" style="width: {{ (100 * count / summary.total)|round|int if summary.total else 0 }}%"></span></span>
+      <strong>{{ count }}</strong>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card">
+  <h2>Orders</h2>
+  <form class="filters" method="get" action="{{ url_for('ops.dashboard') }}">
+    <label>Search
+      <input type="search" name="q" value="{{ q }}" placeholder="Code, name, city or address">
+    </label>
+    <label>Status
+      <select name="status">
+        <option value="">All</option>
+        {% for key in statuses %}<option value="{{ key }}" {{ 'selected' if status == key }}>{{ status_text[key][0] }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="secondary">Filter</button>
+    {% if q or status %}<a href="{{ url_for('ops.dashboard') }}">Clear</a>{% endif %}
+  </form>
+
+  <p class="hint">{{ orders|length }} of {{ summary.total }} orders</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Code</th><th>From</th><th>To</th><th>Parcel</th><th>Price</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for order in orders %}
+        <tr>
+          <td><a href="{{ url_for('customer.show_order', code=order.code) }}">{{ order.code }}</a><br><small>{{ order.created_at|when }}</small></td>
+          <td>{{ order.sender_name }}<br><small>{{ order.pickup_city|city }}</small></td>
+          <td>{{ order.recipient_name }}<br><small>{{ order.delivery_city|city }}</small></td>
+          <td>{{ sizes[order.size][0] }}<br><small>{{ services[order.service][0] }}</small></td>
+          <td class="num">{{ order.price_cents|money }}</td>
+          <td><span class="status status-{{ order.status }}">{{ status_text[order.status][0] }}</span></td>
+          <td>
+            <div class="row-actions">
+              {% if order.next_status %}
+              <form method="post" action="{{ url_for('ops.advance', code=order.code) }}">
+                <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+                <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="status" value="{{ status }}">
+                <button type="submit" class="small">Mark {{ status_text[order.next_status][0]|lower }}</button>
+              </form>
+              {% endif %}
+              {% if order.can_cancel %}
+              <form method="post" action="{{ url_for('ops.cancel', code=order.code) }}">
+                <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+                <input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="status" value="{{ status }}">
+                <button type="submit" class="small danger">Cancel</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No orders match.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

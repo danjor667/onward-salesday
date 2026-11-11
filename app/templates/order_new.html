@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Send a parcel · Onward Logistics{% endblock %}
+{% block content %}
+<h1>Send a parcel</h1>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<div class="order-layout">
+  <form id="order-form" method="post" action="{{ url_for('customer.place_order') }}" data-quote-url="{{ url_for('api.quote') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <ol class="progress" aria-hidden="true" hidden>
+      <li>Route</li><li>Parcel</li><li>People</li>
+    </ol>
+
+    <fieldset class="card step">
+      <legend>1. Route</legend>
+      <div class="pair">
+        <label>Pickup city
+          <select name="pickup_city" required>
+            <option value="">Choose…</option>
+            {% for key, (name, country) in cities.items() %}
+            <option value="{{ key }}" {{ 'selected' if form.get('pickup_city') == key }}>{{ name }}, {{ country }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Pickup address
+          <input name="pickup_address" required maxlength="120" value="{{ form.get('pickup_address', '') }}" placeholder="Street, building, landmark">
+        </label>
+      </div>
+      <div class="pair">
+        <label>Delivery city
+          <select name="delivery_city" required>
+            <option value="">Choose…</option>
+            {% for key, (name, country) in cities.items() %}
+            <option value="{{ key }}" {{ 'selected' if form.get('delivery_city') == key }}>{{ name }}, {{ country }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Delivery address
+          <input name="delivery_address" required maxlength="120" value="{{ form.get('delivery_address', '') }}" placeholder="Street, building, landmark">
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="card step">
+      <legend>2. Parcel</legend>
+      <p class="group-label" id="size-label">Size</p>
+      <div class="choices" role="radiogroup" aria-labelledby="size-label">
+        {% for key, (label, limit, percent) in sizes.items() %}
+        <label class="choice">
+          <input type="radio" name="size" value="{{ key }}" required {{ 'checked' if form.get('size', 'small') == key }}>
+          <span><strong>{{ label }}</strong><small>{{ limit }}</small></span>
+        </label>
+        {% endfor %}
+      </div>
+      <p class="group-label" id="service-label">Speed</p>
+      <div class="choices two" role="radiogroup" aria-labelledby="service-label">
+        <label class="choice">
+          <input type="radio" name="service" value="standard" required {{ 'checked' if form.get('service', 'standard') == 'standard' }}>
+          <span><strong>Standard</strong><small>Best price</small></span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="service" value="express" required {{ 'checked' if form.get('service') == 'express' }}>
+          <span><strong>Express</strong><small>Fastest, +50%</small></span>
+        </label>
+      </div>
+      <label>Notes for the rider <small>(optional)</small>
+        <input name="notes" maxlength="200" value="{{ form.get('notes', '') }}" placeholder="Fragile, call on arrival…">
+      </label>
+    </fieldset>
+
+    <fieldset class="card step">
+      <legend>3. People</legend>
+      <div class="pair">
+        <label>Your name or shop
+          <input name="sender_name" required maxlength="80" value="{{ form.get('sender_name', '') }}" autocomplete="organization">
+        </label>
+        <label>Recipient name
+          <input name="recipient_name" required maxlength="80" value="{{ form.get('recipient_name', '') }}">
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="step-buttons">
+      <button type="button" class="secondary" data-back hidden>Back</button>
+      <button type="button" data-next hidden>Continue</button>
+      <button type="submit" data-submit>Place order</button>
+    </div>
+  </form>
+
+  <aside class="card quote" aria-live="polite">
+    <h2>Your price</h2>
+    <p class="total" data-quote-total>—</p>
+    <p class="hint" data-quote-detail>Choose the two cities to see the price.</p>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='order-form.js') }}" defer></script>{% endblock %}

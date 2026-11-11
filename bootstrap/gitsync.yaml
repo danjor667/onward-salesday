@@ -92,6 +92,7 @@ Resources:
             Action:
               - autoscaling:*
               - cloudwatch:*
+              - dynamodb:*
               - ec2:*
               - elasticloadbalancing:*
             Resource: '*'
@@ -135,7 +136,21 @@ Resources:
             Condition:
               ArnLike:
                 'iam:PolicyARN':
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/onward-*'
                   - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+          - Sid: OnwardPoliciesOnly
+            Effect: Allow
+            Action:
+              - iam:CreatePolicy
+              - iam:CreatePolicyVersion
+              - iam:DeletePolicy
+              - iam:DeletePolicyVersion
+              - iam:GetPolicy
+              - iam:GetPolicyVersion
+              - iam:ListPolicyVersions
+              - iam:TagPolicy
+              - iam:UntagPolicy
+            Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/onward-*'
           - Sid: OnwardInstanceProfilesOnly
             Effect: Allow
             Action:

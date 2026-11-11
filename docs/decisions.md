@@ -19,12 +19,15 @@ Each decision, with its reason in business terms and what was rejected.
 | 13 | Detailed (one minute) CPU monitoring | Scaling reacts in about three minutes instead of ten or more | Basic five minute monitoring: free, but a tripling of orders "within hours" can still outrun it |
 | 14 | One template | The lab asks for one, and the stack is small enough to read top to bottom in numbered sections | Several stacks: clearer ownership at larger scale, more moving parts here |
 | 15 | HTTP only on the load balancer | The lab provides no domain name, and a certificate needs one | See limits |
-| 16 | Region: `eu-central-1` (to confirm) | It is the Region configured in the AWS CLI used to build this. **Confirm or change, and write the justification here**: the Client Profile asks for the Region to be chosen and justified | |
+| 16 | Orders in a DynamoDB table, billed per request | Servers come and go all day, so orders cannot live on them. A shared table means any server can answer any customer. It needs no capacity planning for sales days and costs nothing when idle | Orders in each server's memory: free, but an order vanishes when another server answers or the server is removed. RDS: a database server to size for the peak and pay for all month |
+| 17 | Staff passcode generated at first start and kept in the orders table | No secret in the repository, and every server shares the same one | Secrets Manager: the production answer, at a small monthly cost. A passcode in the template: a credential in Git |
+| 18 | Region: `eu-central-1` (to confirm) | It is the Region configured in the AWS CLI used to build this. **Confirm or change, and write the justification here**: the Client Profile asks for the Region to be chosen and justified | |
 
 ## Limits
 
 - **No HTTPS.** Production needs a domain, an ACM certificate and a 443 listener.
-- **Orders are stored in memory, per server.** Each server has its own list, so a refresh that lands on another server shows different orders, and a replaced server starts again with the sample orders. A real order system needs a shared database; storage is outside this lab.
+- **The Operations pages use one shared passcode**, sent over plain HTTP. Production needs HTTPS and real staff sign-in.
+- **The operations dashboard reads the whole orders table.** Fine at this size; a busy system would add an index by status or date.
 - **New servers take a few minutes** to boot and install. A very sudden spike is absorbed by the headroom below the 50% target, not by new servers. A pre-built image or scheduled scaling before known sales days would shorten this.
 - **The load test makes servers busy directly**; it does not send customer traffic. It proves the scaling behaviour, not how many orders per second a server handles.
 - **The repository must be public** for servers to download it.

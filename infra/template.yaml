@@ -10,7 +10,7 @@ Description: >-
 #   2. Outbound access  Regional NAT Gateway
 #   3. Security groups  who may talk to whom
 #   4. Load balancer    the single public entry point
-#   5. Servers          role, launch template (how a server builds itself)
+#   5. Servers          orders table, role, launch template (how a server builds itself)
 #   6. Auto Scaling     how many servers, and what changes that number
 #   7. Load test        a secure way to simulate a sales day
 
@@ -283,7 +283,7 @@ Resources:
       GroupDescription: Application servers. In from the load balancer only, out over HTTPS only.
       VpcId: !Ref Vpc
       SecurityGroupEgress:
-        - Description: HTTPS out through the NAT gateway (packages, updates, Systems Manager)
+        - Description: HTTPS out through the NAT gateway (packages, updates, Systems Manager, DynamoDB)
           IpProtocol: tcp
           FromPort: 443
           ToPort: 443
@@ -359,9 +359,54 @@ Resources:
           TargetGroupArn: !Ref TargetGroup
 
   # ============================================================ 5. Servers ==
-  # The only permission a server has: to be managed through AWS Systems
-  # Manager. That is how engineers open a shell (Session Manager) and how
-  # the load test runs, without SSH keys or open ports.
+  # Where orders are kept. One table shared by every server, so an order
+  # placed through one server is found by all of them, and survives servers
+  # being added, removed or replaced. Billed per request: it costs nothing
+  # while nobody is ordering, and needs no capacity planning for sales days.
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    # Deleting the stack deletes the orders. Right for a lab environment
+    # that is rebuilt from code; production would use Retain.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      TableName: !Sub 'onward-${Environment}-${Purpose}'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - {AttributeName: pk, AttributeType: S}
+      KeySchema:
+        - {AttributeName: pk, KeyType: HASH}
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true   # restore to any second of the last 35 days
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - {Key: Project, Value: onward}
+        - {Key: Owner, Value: !Ref Owner}
+        - {Key: Environment, Value: !Ref Environment}
+
+  # A server has two permissions and no others:
+  #   - to be managed through AWS Systems Manager. That is how engineers
+  #     open a shell (Session Manager) and how the load test runs, without
+  #     SSH keys or open ports.
+  #   - to read and write the orders table.
+  ServerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub 'onward-${Environment}-${Purpose}-server'
+      Description: Lets the order application read and write its own orders table.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: OrdersTableOnly
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:Scan
+            Resource: !GetAtt OrdersTable.Arn
+
   ServerRole:
     Type: AWS::IAM::Role
     Properties:
@@ -374,6 +419,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        - !Ref ServerPolicy
       Tags:
         - {Key: Project, Value: onward}
         - {Key: Owner, Value: !Ref Owner}
@@ -446,6 +492,8 @@ Resources:
             export OWNER_NAME='${Owner}'
             export LAB_NAME='${LabName}'
             export APP_VERSION='${AppVersion}'
+            export ORDERS_TABLE='${OrdersTable}'
+            export AWS_DEFAULT_REGION='${AWS::Region}'
             bash /opt/onward/scripts/install.sh
 
   # ======================================================= 6. Auto Scaling ==
@@ -544,3 +592,5 @@ Outputs:
     Value: !Ref ServerGroup
   LoadTestDocumentName:
     Value: !Ref LoadTestDocument
+  OrdersTableName:
+    Value: !Ref OrdersTable

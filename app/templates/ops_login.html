@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Staff sign in · Onward Logistics{% endblock %}
+{% block content %}
+<form class="card narrow" method="post" action="{{ url_for('ops.login') }}">
+  <h1>Operations</h1>
+  <p class="hint">For riders and staff. Enter the staff passcode.</p>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <label>Passcode
+    <input type="password" name="passcode" required autocomplete="current-password" autofocus>
+  </label>
+  <button type="submit">Sign in</button>
+</form>
+{% endblock %}

@@ -25,6 +25,7 @@ runs two servers for 16 hours and six servers for 8 hours.
 | Load balancer | about $0.027 per hour, plus usage | **$0.65** | about **$0.75** (more requests) |
 | Regional NAT Gateway | about $0.052 per hour per zone in use, plus about $0.052 per GB | 2 zones × 24 h = **$2.50** | **$2.50** plus a little data |
 | Disks (8 GB gp3 per server) | about $0.095 per GB-month | $0.05 | $0.09 |
+| DynamoDB orders table (on-demand) | about $1.25 per million writes, $0.25 per million reads | under $0.01 | a few cents, even at three times the orders |
 | **Total** | | **about $3.90** | **about $5.00** |
 
 Per month that is roughly **$120** if every day were quiet.
@@ -57,6 +58,7 @@ day" and "Peak day", so the Finance Lead sees both side by side.
 | Elastic Load Balancing | 1 Application Load Balancer, with an estimate of requests and data per hour | [Elastic Load Balancing pricing](https://aws.amazon.com/elasticloadbalancing/pricing/) |
 | Amazon VPC, NAT Gateway | 1 regional NAT gateway, 2 Availability Zones, a few GB of data per month | [VPC pricing](https://aws.amazon.com/vpc/pricing/) |
 | Amazon CloudWatch | Detailed monitoring metrics for the instances | [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) |
+| Amazon DynamoDB | On-demand capacity, with the number of orders per day (each order is a handful of writes and reads). Quiet: your normal volume. Peak: three times that | [DynamoDB pricing](https://aws.amazon.com/dynamodb/pricing/on-demand/) |
 
 Then choose *Share* and paste the public link at the top of this page.
 Extra CPU credits for `unlimited` mode are explained under "Unlimited mode"

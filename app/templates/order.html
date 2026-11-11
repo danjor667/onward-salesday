@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}{{ order.code }} · Onward Logistics{% endblock %}
+{% block content %}
+{% if just_placed %}
+<p class="success" role="status">Order placed. Keep your tracking code and share it with the recipient.</p>
+{% endif %}
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+<section class="card">
+  <div class="order-head">
+    <div>
+      <p class="label">Tracking code</p>
+      <p class="code">{{ order.code }}</p>
+    </div>
+    <span class="status big status-{{ order.status }}">{{ status_text[order.status][0] }}</span>
+  </div>
+  <p class="route">{{ order.pickup_city|city }} <span aria-hidden="true">→</span><span class="sr-only">to</span> {{ order.delivery_city|city }}</p>
+  {% if order.is_active %}<p class="eta">Estimated delivery by <strong>{{ order.eta|when }}</strong></p>{% endif %}
+
+  <ol class="timeline">
+    {% for step in order.timeline %}
+    <li class="{{ 'done' if step.at }} {{ 'current' if step.current }} {{ 'stopped' if step.status == 'cancelled' }}">
+      <strong>{{ step.title }}</strong>
+      <span>{{ step.at|when if step.at else 'Not yet' }}</span>
+      {% if step.current %}<p>{{ step.detail }}</p>{% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="card">
+  <h2>Order details</h2>
+  <dl>
+    <div><dt>From</dt><dd>{{ order.sender_name }}<br><small>{{ order.pickup_address }}, {{ order.pickup_city|city }}</small></dd></div>
+    <div><dt>To</dt><dd>{{ order.recipient_name }}<br><small>{{ order.delivery_address }}, {{ order.delivery_city|city }}</small></dd></div>
+    <div><dt>Parcel</dt><dd>{{ sizes[order.size][0] }} <small>({{ sizes[order.size][1] }})</small></dd></div>
+    <div><dt>Speed</dt><dd>{{ services[order.service][0] }}</dd></div>
+    {% if order.notes %}<div><dt>Notes for the rider</dt><dd>{{ order.notes }}</dd></div>{% endif %}
+    <div><dt>Placed</dt><dd>{{ order.created_at|when }}</dd></div>
+  </dl>
+</section>
+
+<section class="card">
+  <h2>Price</h2>
+  <table class="breakdown">
+    <tr><td>{{ routes[order.route_type].label }} delivery</td><td>{{ price.base_cents|money }}</td></tr>
+    <tr><td>{{ sizes[order.size][0] }} parcel</td><td>× {{ '%.1f'|format(price.size_percent / 100) }}</td></tr>
+    <tr><td>{{ services[order.service][0] }} speed</td><td>× {{ '%.1f'|format(price.service_percent / 100) }}</td></tr>
+    <tr class="sum"><th>Total</th><th>{{ order.price_cents|money }}</th></tr>
+  </table>
+</section>
+
+<div class="actions">
+  <a class="button secondary" href="{{ url_for('customer.new_order') }}">Send another parcel</a>
+  {% if order.can_cancel %}
+  <form method="post" action="{{ url_for('customer.cancel_order', code=order.code) }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="danger">Cancel this order</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

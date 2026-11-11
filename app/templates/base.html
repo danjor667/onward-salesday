@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Onward Logistics{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="site">
+    <div class="bar">
+      <a class="brand" href="{{ url_for('customer.home') }}"><span class="mark" aria-hidden="true">➜</span> Onward Logistics</a>
+      <nav>
+        <a href="{{ url_for('customer.new_order') }}">Send a parcel</a>
+        <a href="{{ url_for('customer.home') }}#track">Track</a>
+        <a href="{{ url_for('ops.dashboard') }}">Operations</a>
+      </nav>
+    </div>
+    <p class="credit"><strong>{{ owner_name }}</strong> · {{ lab_name }}</p>
+  </header>
+
+  <main>{% block content %}{% endblock %}</main>
+
+  <footer class="site">
+    <span class="answered">Answered by {{ runtime.kind }} <code>{{ runtime.id }}</code> in zone <code>{{ runtime.zone }}</code></span>
+    <span>Version <code>{{ version }}</code></span>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
