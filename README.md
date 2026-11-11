@@ -39,6 +39,8 @@ flowchart TB
 - **Every page shows which server answered** (instance ID and zone), so you can watch requests spread as servers come and go.
 - **Orders live in one DynamoDB table** shared by all servers, so an order placed through one server is found by every other, including servers that did not exist when it was placed.
 
+![Architecture: public load balancer, private auto-scaling servers across two zones, Regional NAT Gateway](docs/architecture.png)
+
 ## What is in this repository
 
 | Path | What it is |
@@ -50,6 +52,8 @@ flowchart TB
 | `scripts/install.sh` | Run by every new server to install and start the application |
 | `scripts/load-test.sh` | Simulates a sales day, securely |
 | `tests/` | Application tests |
+| `docs/discovery-report.docx` | Discovery report (Word): the problem, options considered, and the business value |
+| `docs/architecture.png` | Architecture diagram |
 | `docs/decisions.md` | Each design decision, its reason, and what was rejected |
 | `docs/cost.md` | What the design costs on a quiet day and on a peak day |
 
