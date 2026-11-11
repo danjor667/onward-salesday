@@ -4,13 +4,45 @@ Prices are approximate on-demand list prices for `eu-central-1` and differ
 by Region. Free Tier allowances or credits, if the account has them, reduce
 these figures.
 
-**Official estimate:** build and share one in the
-[AWS Pricing Calculator](https://calculator.aws/#/). It is free, needs no
-AWS account, and produces a public link you can hand to the Finance Lead.
-The inputs to enter are listed in [Building the estimate](#building-the-estimate)
-below.
+**Official estimate (public link, no AWS account needed):**
+[Onward Logistics - Lab 1 Sales Day (eu-central-1)](https://calculator.aws/#/estimate?id=e34730670194ab6ccce1bf92ca342f5bdccbf694)
+on the AWS Pricing Calculator: **USD 121.57 per month**, saved on 11 November 2026.
+The link expires after one year.
 
-> Shared estimate link: _paste the link from "Share" in the calculator here_
+| Line in the public estimate | USD / month |
+|---|---|
+| Amazon EC2: 2 × `t3.micro` all month, 8 GB gp3 each, detailed monitoring | 23.24 |
+| Amazon EC2: sale days, 4 extra `t3.micro` × 32 h (8 h × 4 sale days), 8 GB gp3 | 1.68 |
+| Elastic Load Balancing: 1 Application Load Balancer, low traffic | 19.79 |
+| Amazon VPC: 1 Regional NAT Gateway active in 2 zones, 10 GB processed | 76.44 |
+| Amazon DynamoDB: on-demand, 120,000 writes, 300,000 reads, 1 GB | 0.42 |
+| **Total** | **121.57** |
+
+The public calculator has no field for `unlimited` CPU credits on sale days (about USD 2
+more), which is why it is slightly below the console estimate below.
+
+## AWS Pricing Calculator estimate
+
+**Estimate:** `onward-dev-salesday-monthly` in the AWS console's Pricing Calculator
+([Billing and Cost Management → Pricing Calculator → Workload estimates](https://us-east-1.console.aws.amazon.com/costmanagement/home#/pricing-calculator)),
+priced by AWS at on-demand rates for `eu-central-1` on 11 November 2026. Anyone signed in
+to this AWS account can open it; it expires on 11 December 2027.
+
+**Total: USD 124.30 per month**, assuming four sale days a month.
+
+| Group | Usage entered | USD / month |
+|---|---|---|
+| Quiet days: 2 servers | 2 × `t3.micro` × 730 h; 17.4 GB-month gp3 | 19.18 |
+| Sale days: up to 4 extra servers | 4 × 8 h × 4 sale days = 128 h; 40 vCPU-hours of `unlimited` CPU credits | 3.54 |
+| Network: Regional NAT Gateway | 2 zones × 730 h; 10 GB processed | 76.44 |
+| Network: Application Load Balancer | 730 h; 100 LCU-hours | 20.51 |
+| Monitoring: 1-minute EC2 metrics | 15 detailed-monitoring metrics | 4.50 |
+| Orders: DynamoDB on-demand | ~30,000 orders: 120,000 writes, 300,000 reads | 0.14 |
+| **Total** | | **124.30** |
+
+What this shows the Finance Lead: the sale-day capacity adds about USD 3.50 a month, while
+the always-on network pieces (NAT gateway and load balancer) are about 78% of the bill.
+
 
 ## Quiet day and peak day
 
