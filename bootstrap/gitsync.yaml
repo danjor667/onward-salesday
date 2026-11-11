@@ -35,9 +35,12 @@ Resources:
       OwnerId: !Ref GitHubOwner
       RepositoryName: !Ref RepositoryName
       Tags:
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   # ------------------------------------------------------- GitSync role ----
   # Two managed policies, kept apart so each can be read on its own:
@@ -189,9 +192,12 @@ Resources:
         - !Ref GitSyncPolicy
         - !Ref DeployPolicy
       Tags:
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   # ----------------------------------------------------------- The sync ----
   # Watches one deployment file. That file names the template and holds the

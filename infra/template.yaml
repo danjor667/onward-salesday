@@ -95,19 +95,27 @@ Resources:
       EnableDnsSupport: true
       EnableDnsHostnames: true
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-vpc'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-vpc'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-igw'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-igw'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   InternetGatewayAttachment:
     Type: AWS::EC2::VPCGatewayAttachment
@@ -124,10 +132,14 @@ Resources:
       CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 4, 8]]
       MapPublicIpOnLaunch: false
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-public-a'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-public-a'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   PublicSubnetB:
     Type: AWS::EC2::Subnet
@@ -137,20 +149,28 @@ Resources:
       CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 4, 8]]
       MapPublicIpOnLaunch: false
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-public-b'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-public-b'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref Vpc
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-public'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-public'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   PublicDefaultRoute:
     Type: AWS::EC2::Route
@@ -183,10 +203,14 @@ Resources:
       CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 4, 8]]
       MapPublicIpOnLaunch: false
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-private-a'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-private-a'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   PrivateSubnetB:
     Type: AWS::EC2::Subnet
@@ -196,20 +220,28 @@ Resources:
       CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 4, 8]]
       MapPublicIpOnLaunch: false
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-private-b'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-private-b'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref Vpc
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-private'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-private'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   PrivateSubnetARouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
@@ -236,10 +268,14 @@ Resources:
       AvailabilityMode: regional
       ConnectivityType: public
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-nat'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-nat'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   # One route for both private subnets: that is the point of "regional".
   PrivateDefaultRoute:
@@ -271,10 +307,14 @@ Resources:
           ToPort: !FindInMap [App, Settings, Port]
           DestinationSecurityGroupId: !Ref ServerSecurityGroup
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-alb'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-alb'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   ServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -289,10 +329,14 @@ Resources:
           ToPort: 443
           CidrIp: 0.0.0.0/0
       Tags:
-        - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}-server'}
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Name
+          Value: !Sub 'onward-${Environment}-${Purpose}-server'
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   # Separate resource (not inline) to avoid a circular reference between the
   # two groups.
@@ -316,12 +360,17 @@ Resources:
       Subnets: [!Ref PublicSubnetA, !Ref PublicSubnetB]
       SecurityGroups: [!Ref LoadBalancerSecurityGroup]
       LoadBalancerAttributes:
-        - {Key: routing.http.drop_invalid_header_fields.enabled, Value: 'true'}
-        - {Key: idle_timeout.timeout_seconds, Value: '60'}
+        - Key: routing.http.drop_invalid_header_fields.enabled
+          Value: 'true'
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
       Tags:
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   # The list of servers currently able to take requests. The Auto Scaling
   # group adds and removes servers here by itself. Stickiness is off, so
@@ -339,14 +388,19 @@ Resources:
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
       UnhealthyThresholdCount: 3
-      Matcher: {HttpCode: '200'}
+      Matcher:
+        HttpCode: '200'
       TargetGroupAttributes:
         # How long in-flight requests get to finish before a server is removed.
-        - {Key: deregistration_delay.timeout_seconds, Value: '30'}
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
       Tags:
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -373,17 +427,22 @@ Resources:
       TableName: !Sub 'onward-${Environment}-${Purpose}'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - {AttributeName: pk, AttributeType: S}
+        - AttributeName: pk
+          AttributeType: S
       KeySchema:
-        - {AttributeName: pk, KeyType: HASH}
+        - AttributeName: pk
+          KeyType: HASH
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true   # restore to any second of the last 35 days
       SSESpecification:
         SSEEnabled: true
       Tags:
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   # A server has two permissions and no others:
   #   - to be managed through AWS Systems Manager. That is how engineers
@@ -415,15 +474,19 @@ Resources:
         Version: '2012-10-17'
         Statement:
           - Effect: Allow
-            Principal: {Service: ec2.amazonaws.com}
+            Principal:
+              Service: ec2.amazonaws.com
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore'
         - !Ref ServerPolicy
       Tags:
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
   ServerInstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -440,9 +503,12 @@ Resources:
       TagSpecifications:
         - ResourceType: launch-template
           Tags:
-            - {Key: Project, Value: onward}
-            - {Key: Owner, Value: !Ref Owner}
-            - {Key: Environment, Value: !Ref Environment}
+            - Key: Project
+              Value: onward
+            - Key: Owner
+              Value: !Ref Owner
+            - Key: Environment
+              Value: !Ref Environment
       LaunchTemplateData:
         ImageId: !Ref LatestAmiId
         InstanceType: !Ref InstanceType
@@ -468,16 +534,24 @@ Resources:
         TagSpecifications:
           - ResourceType: instance
             Tags:
-              - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}'}
-              - {Key: Project, Value: onward}
-              - {Key: Owner, Value: !Ref Owner}
-              - {Key: Environment, Value: !Ref Environment}
+              - Key: Name
+                Value: !Sub 'onward-${Environment}-${Purpose}'
+              - Key: Project
+                Value: onward
+              - Key: Owner
+                Value: !Ref Owner
+              - Key: Environment
+                Value: !Ref Environment
           - ResourceType: volume
             Tags:
-              - {Key: Name, Value: !Sub 'onward-${Environment}-${Purpose}'}
-              - {Key: Project, Value: onward}
-              - {Key: Owner, Value: !Ref Owner}
-              - {Key: Environment, Value: !Ref Environment}
+              - Key: Name
+                Value: !Sub 'onward-${Environment}-${Purpose}'
+              - Key: Project
+                Value: onward
+              - Key: Owner
+                Value: !Ref Owner
+              - Key: Environment
+                Value: !Ref Environment
         # Runs once, as root, on first boot: fetch this repository at the
         # chosen version and hand over to scripts/install.sh, which installs
         # and starts the application. Output: /var/log/cloud-init-output.log
@@ -530,9 +604,15 @@ Resources:
       MetricsCollection:
         - Granularity: 1Minute
       Tags:
-        - {Key: Project, Value: onward, PropagateAtLaunch: true}
-        - {Key: Owner, Value: !Ref Owner, PropagateAtLaunch: true}
-        - {Key: Environment, Value: !Ref Environment, PropagateAtLaunch: true}
+        - Key: Project
+          Value: onward
+          PropagateAtLaunch: true
+        - Key: Owner
+          Value: !Ref Owner
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: !Ref Environment
+          PropagateAtLaunch: true
 
   # Target tracking works like a thermostat: keep average CPU across the
   # group near the target. Above it, add servers; well below it for about
@@ -580,9 +660,12 @@ Resources:
                 - 'wait'
                 - 'exit 0'
       Tags:
-        - {Key: Project, Value: onward}
-        - {Key: Owner, Value: !Ref Owner}
-        - {Key: Environment, Value: !Ref Environment}
+        - Key: Project
+          Value: onward
+        - Key: Owner
+          Value: !Ref Owner
+        - Key: Environment
+          Value: !Ref Environment
 
 Outputs:
   ApplicationUrl:
