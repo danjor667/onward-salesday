@@ -157,7 +157,18 @@ aws cloudformation deploy \
   --tags Project=onward Environment=$ENV Owner="$OWNER"
 ```
 
-**4. Open the application** once the stack reaches `CREATE_COMPLETE` (about five minutes).
+**4. Create the empty stack for Git sync to take over.** Git sync only updates stacks that already exist, so the stack is created once from a placeholder template. Git sync then replaces it with `infra/template.yaml` on the next commit that touches `infra/deployments/dev.yaml` or the template.
+
+```bash
+aws cloudformation deploy \
+  --stack-name onward-$ENV-salesday \
+  --template-file bootstrap/placeholder.yaml \
+  --tags Project=onward Environment=$ENV Owner="$OWNER"
+```
+
+Then push any change to `infra/deployments/dev.yaml` (a comment is enough) to start the first sync.
+
+**5. Open the application** once the stack reaches `UPDATE_COMPLETE` (about five to ten minutes).
 
 ```bash
 aws cloudformation describe-stacks --stack-name onward-$ENV-salesday \
@@ -168,7 +179,6 @@ aws cloudformation describe-stacks --stack-name onward-$ENV-salesday \
 
 The templates pass `cfn-lint`, and the install script was run successfully in an Amazon Linux 2023 container, but the stack has not yet been deployed to an account. Watch for:
 
-- **GitSync creating the stack.** Step 3 assumes a new sync configuration creates its stack straight away. If it does not appear, push a commit that touches `infra/deployments/dev.yaml`.
 - **The role GitSync deploys with.** It carries the deployment permissions itself (`onward-dev-salesday-deploy`). If the stack fails with an access error, add the missing action to that policy in `bootstrap/gitsync.yaml`.
 - **Servers not becoming healthy.** Open a session on one (see below) and read `/var/log/cloud-init-output.log`.
 
@@ -189,7 +199,7 @@ URL=$(aws cloudformation describe-stacks --stack-name onward-dev-salesday \
 | Only the load balancer is public | Servers have no public IP (`aws ec2 describe-instances --filters Name=tag:Name,Values=onward-dev-salesday --query "Reservations[].Instances[].[InstanceId,PublicIpAddress]"`). The server security group accepts only the load balancer, and no group has port 22 |
 | Servers can still download updates | They installed Python packages from the internet at launch. From a session: `curl -sI https://pypi.org | head -1` |
 | No admin ports | `aws ssm start-session --target <instance-id>` opens a shell with no SSH key and no open port (needs the Session Manager plugin for the AWS CLI) |
-| Rebuilt from the repository | The four steps above |
+| Rebuilt from the repository | The five steps above |
 
 ## Removing everything
 

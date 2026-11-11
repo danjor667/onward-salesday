@@ -1,0 +1,10 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Onward Logistics sales day - bootstrap step 3. An empty stack that
+  CloudFormation Git sync then takes over. Git sync only updates stacks that
+  already exist, so the stack is created once with this placeholder and its
+  first sync replaces it with infra/template.yaml.
+
+Resources:
+  Placeholder:
+    Type: AWS::CloudFormation::WaitConditionHandle
