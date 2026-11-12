@@ -52,9 +52,8 @@ flowchart TB
 | `scripts/install.sh` | Run by every new server to install and start the application |
 | `scripts/load-test.sh` | Simulates a sales day, securely |
 | `tests/` | Application tests |
-| `docs/discovery-report.docx` | Discovery report (Word): the problem, options considered, and the business value |
+| `docs/discovery-report.docx` | Discovery report (Word): the problem, options considered, the business value and the key design decisions |
 | `docs/architecture.png` | Architecture diagram |
-| `docs/decisions.md` | Each design decision, its reason, and what was rejected |
 | `docs/cost.md` | What the design costs on a quiet day and on a peak day |
 
 ### Inside `app/`

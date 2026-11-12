@@ -62,7 +62,7 @@ Parameters:
     Description: >-
       unlimited lets a busy server keep full speed for a small extra charge.
       standard never costs extra but slows a server to 10% once its credits
-      run out, which defeats scaling on CPU. See docs/decisions.md.
+      run out, which defeats scaling on CPU.
   LatestAmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
