@@ -25,4 +25,4 @@ echo
 echo "Watch the group grow:"
 echo "  watch -n 15 \"aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names ${NAME} --query 'AutoScalingGroups[0].[DesiredCapacity,Instances[].[InstanceId,AvailabilityZone,LifecycleState]]' --output text\""
 echo
-echo "The load stops by itself after ${SECONDS_BUSY}s. Servers are removed about 15 minutes later."
+echo "The load stops by itself after ${SECONDS_BUSY}s. Servers start being removed about 3 minutes later, one at a time."

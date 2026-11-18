@@ -196,7 +196,7 @@ URL=$(aws cloudformation describe-stacks --stack-name onward-dev-salesday \
 |---|---|
 | One public address, stays reachable | Open `$URL`. Keep `while true; do curl -s -o /dev/null -w "%{http_code}\n" $URL; sleep 1; done` running through the other checks |
 | Requests shared, page shows the server | `for i in $(seq 8); do curl -s $URL/health; echo; done` shows different `answered_by` values. The footer of every page shows the same. Place an order, then refresh its tracking page: different servers answer, and each one finds the order |
-| Grows under demand, shrinks afterwards | `scripts/load-test.sh 600`. Servers are added within about three to five minutes. Roughly fifteen minutes after the load ends they are removed |
+| Grows under demand, shrinks afterwards | `scripts/load-test.sh 600`. Servers are added within about three to five minutes. About three minutes after the load ends they start being removed, one at a time |
 | Failed server is replaced | `aws ec2 terminate-instances --instance-ids <id>`: the page keeps answering and a new server appears |
 | Survives the loss of a zone | Servers run in two zones (shown on the page). Terminate every server in one zone: the other zone keeps answering while replacements start |
 | Only the load balancer is public | Servers have no public IP (`aws ec2 describe-instances --filters Name=tag:Name,Values=onward-dev-salesday --query "Reservations[].Instances[].[InstanceId,PublicIpAddress]"`). The server security group accepts only the load balancer, and no group has port 22 |

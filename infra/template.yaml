@@ -519,9 +519,10 @@ Resources:
       MetricsCollection:
         - Granularity: 1Minute
 
-  # Target tracking works like a thermostat: keep average CPU across the
-  # group near the target. Above it, add servers; well below it for about
-  # fifteen minutes, remove them. It creates and manages its own alarms.
+  # Scaling out: target tracking works like a thermostat. When average CPU
+  # across the group stays above the target for three minutes, it adds
+  # servers. Its own scale-in waits fifteen minutes and cannot be changed,
+  # so it is switched off here and ScaleInPolicy below does that job.
   CpuScalingPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:
@@ -531,6 +532,39 @@ Resources:
         PredefinedMetricSpecification:
           PredefinedMetricType: ASGAverageCPUUtilization
         TargetValue: !Ref CpuTargetPercent
+        DisableScaleIn: true
+
+  # Scaling in: remove one server at a time once average CPU has been below
+  # 40% for three minutes in a row. Keep 40 below CpuTargetPercent, or the
+  # group would remove a server and then add it straight back.
+  ScaleInPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref ServerGroup
+      PolicyType: StepScaling
+      AdjustmentType: ChangeInCapacity
+      MetricAggregationType: Average
+      StepAdjustments:
+        - MetricIntervalUpperBound: 0
+          ScalingAdjustment: -1
+
+  CpuLowAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'onward-${Environment}-${Purpose}-cpu-low'
+      AlarmDescription: Average server CPU below 40% for 3 minutes. Removes one server.
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref ServerGroup
+      Statistic: Average
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 40
+      ComparisonOperator: LessThanThreshold
+      AlarmActions:
+        - !Ref ScaleInPolicy
 
   # ========================================================== 6. Load test ==
   # Makes every CPU core busy for a set time, to simulate a sales day.
