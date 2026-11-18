@@ -1,7 +1,7 @@
 # GitSync deployment file for stack onward-dev-salesday.
 # Changing this file or the template, and merging to main, updates the stack.
 # The stack must exist before the first sync: see step 4 in the README.
-# Region: eu-central-1.
+# Region: eu-central-1 (Frankfurt).
 template-file-path: infra/template.yaml
 
 parameters:
