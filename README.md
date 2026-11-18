@@ -22,17 +22,21 @@ flowchart TB
       ASG["Auto Scaling group, 2 to 6 servers<br/>Amazon Linux 2023, t3.micro"]
     end
     NAT[Regional NAT Gateway<br/>outbound only]
+    GWE[S3 and DynamoDB<br/>gateway endpoints]
   end
 
   ALB -->|8080, health checked| ASG
-  ASG -->|HTTPS out| NAT --> NET((Internet:<br/>packages, GitHub, Systems Manager))
-  ASG -->|orders| DDB[(DynamoDB orders table<br/>shared by all servers)]
+  ASG -->|HTTPS out| NAT --> NET((Internet:<br/>GitHub, Systems Manager))
+  ASG --> GWE
+  GWE -->|orders| DDB[(DynamoDB orders table<br/>shared by all servers)]
+  GWE -->|packages| S3[(Amazon Linux repositories in S3)]
   CW[CloudWatch: average CPU] -->|above 50%: add<br/>well below: remove| ASG
   ENG[Engineer with AWS credentials] -->|Systems Manager,<br/>no SSH, no open port| ASG
 ```
 
 - **Customers** reach one address: the load balancer. It shares requests across healthy servers.
-- **Servers** sit in private subnets. Nothing on the internet can connect to them. They connect *out* through the NAT gateway to download what they need.
+- **Servers** sit in private subnets. Nothing on the internet can connect to them. They connect *out* through one Regional NAT Gateway, which serves both zones. Orders (DynamoDB) and packages (S3) go through free gateway endpoints and never leave the AWS network.
+- **The network follows the VPC lab** (`onward-orders` network): public subnets for the load balancer, private subnets for servers, and gateway endpoints. Instead of the VPC lab's NAT gateway per zone, it uses one Regional NAT Gateway, which spans both zones by itself: no Elastic IPs and one private route table.
 - **The Auto Scaling group** keeps between two and six servers running, spread over two zones. It replaces any server that fails its health check.
 - **A scaling policy** watches average CPU. Above 50% it adds servers; when CPU stays low it removes them.
 - **Each server builds itself** at launch: it downloads this repository and runs `scripts/install.sh`. Nobody logs in.
@@ -134,7 +138,7 @@ OWNER="Jordan Steve"
 aws cloudformation deploy \
   --stack-name onward-$ENV-salesday-connection \
   --template-file bootstrap/connection.yaml \
-  --parameter-overrides Environment=$ENV Owner="$OWNER" \
+  --parameter-overrides Environment=$ENV \
   --tags Project=onward Environment=$ENV Owner="$OWNER"
 ```
 
@@ -150,7 +154,7 @@ aws cloudformation deploy \
   --stack-name onward-$ENV-salesday-gitsync \
   --template-file bootstrap/gitsync.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameter-overrides Environment=$ENV Owner="$OWNER" \
+  --parameter-overrides Environment=$ENV \
       ConnectionArn=$CONNECTION_ARN \
       GitHubOwner=danjor667 RepositoryName=onward-salesday \
   --tags Project=onward Environment=$ENV Owner="$OWNER"

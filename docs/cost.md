@@ -4,6 +4,9 @@ Prices are approximate on-demand list prices for `eu-central-1` and differ
 by Region. Free Tier allowances or credits, if the account has them, reduce
 these figures.
 
+> **Since these estimates were saved,** free S3 and DynamoDB gateway endpoints were added.
+> They cost nothing and slightly lower the NAT gateway's per-GB charge, so the totals still hold.
+
 **Official estimate (public link, no AWS account needed):**
 [Onward Logistics - Lab 1 Sales Day (eu-central-1)](https://calculator.aws/#/estimate?id=e34730670194ab6ccce1bf92ca342f5bdccbf694)
 on the AWS Pricing Calculator: **USD 121.57 per month**, saved on 11 November 2026.
@@ -56,6 +59,7 @@ runs two servers for 16 hours and six servers for 8 hours.
 | Detailed monitoring | about $2.10 per server per month | $0.14 | $0.23 |
 | Load balancer | about $0.027 per hour, plus usage | **$0.65** | about **$0.75** (more requests) |
 | Regional NAT Gateway | about $0.052 per hour per zone in use, plus about $0.052 per GB | 2 zones × 24 h = **$2.50** | **$2.50** plus a little data |
+| S3 and DynamoDB gateway endpoints | free | $0 | $0 |
 | Disks (8 GB gp3 per server) | about $0.095 per GB-month | $0.05 | $0.09 |
 | DynamoDB orders table (on-demand) | about $1.25 per million writes, $0.25 per million reads | under $0.01 | a few cents, even at three times the orders |
 | **Total** | | **about $3.90** | **about $5.00** |
@@ -66,7 +70,7 @@ Per month that is roughly **$120** if every day were quiet.
 
 - **A peak day costs about a dollar more than a quiet day.** Tripling the servers for eight hours adds cents, because servers are the cheap part.
 - **Running peak capacity all month would cost about $1.15 more per day** in servers alone (six servers instead of two), for capacity that sits idle most of the time. At this size the saving is small; it grows in proportion as the system does, and the larger benefit is not having to guess the peak or resize by hand.
-- **The fixed parts dominate.** The NAT gateway and the load balancer cost about $3.15 a day whether or not anyone places an order. The NAT gateway alone is about two thirds of the quiet day bill.
+- **The fixed parts dominate.** The NAT gateway and the load balancer cost about $3.15 a day whether or not anyone places an order. The NAT gateway alone is about two thirds of the quiet day bill. Sending orders and package downloads through the free gateway endpoints keeps its per-GB charge low.
 
 ## Choices that affect cost
 

@@ -11,8 +11,6 @@ Parameters:
   Purpose:
     Type: String
     Default: salesday
-  Owner:
-    Type: String
   ConnectionArn:
     Type: String
     Description: >-
@@ -34,13 +32,6 @@ Resources:
       ConnectionArn: !Ref ConnectionArn
       OwnerId: !Ref GitHubOwner
       RepositoryName: !Ref RepositoryName
-      Tags:
-        - Key: Project
-          Value: onward
-        - Key: Owner
-          Value: !Ref Owner
-        - Key: Environment
-          Value: !Ref Environment
 
   # ------------------------------------------------------- GitSync role ----
   # Two managed policies, kept apart so each can be read on its own:
@@ -191,13 +182,6 @@ Resources:
       ManagedPolicyArns:
         - !Ref GitSyncPolicy
         - !Ref DeployPolicy
-      Tags:
-        - Key: Project
-          Value: onward
-        - Key: Owner
-          Value: !Ref Owner
-        - Key: Environment
-          Value: !Ref Environment
 
   # ----------------------------------------------------------- The sync ----
   # Watches one deployment file. That file names the template and holds the

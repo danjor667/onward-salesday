@@ -14,8 +14,6 @@ Parameters:
   Purpose:
     Type: String
     Default: salesday
-  Owner:
-    Type: String
 
 Resources:
   GitHubConnection:
@@ -23,13 +21,6 @@ Resources:
     Properties:
       ConnectionName: !Sub 'onward-${Environment}-${Purpose}'
       ProviderType: GitHub
-      Tags:
-        - Key: Project
-          Value: onward
-        - Key: Owner
-          Value: !Ref Owner
-        - Key: Environment
-          Value: !Ref Environment
 
 Outputs:
   ConnectionArn:
