@@ -12,33 +12,45 @@ console.
 
 ```mermaid
 flowchart TB
-  USERS((Customers and merchants)) -->|HTTP 80| ALB
+  USERS((Customers and merchants)) -->|HTTP 80| IGW[Internet gateway]
 
-  subgraph VPC["VPC, two Availability Zones"]
-    subgraph PUB["Public subnets"]
-      ALB[Application Load Balancer<br/>the only public address]
+  subgraph VPC["VPC 10.30.0.0/16"]
+    subgraph AZA["Availability Zone a"]
+      subgraph PUBA["Public subnet 10.30.0.0/24"]
+        ALBA[Load balancer node]
+      end
+      subgraph PRIVA["Private subnet 10.30.2.0/24"]
+        EC2A["EC2 server :8080"]
+      end
     end
-    subgraph PRIV["Private subnets: no public IP, no inbound from internet"]
-      ASG["Auto Scaling group, 2 to 6 servers<br/>Amazon Linux 2023, t3.micro"]
+    subgraph AZB["Availability Zone b"]
+      subgraph PUBB["Public subnet 10.30.1.0/24"]
+        ALBB[Load balancer node]
+      end
+      subgraph PRIVB["Private subnet 10.30.3.0/24"]
+        EC2B["EC2 server :8080"]
+      end
     end
-    NAT[Regional NAT Gateway<br/>outbound only]
+    NAT[Regional NAT Gateway<br/>both zones, outbound only]
     GWE[S3 and DynamoDB<br/>gateway endpoints]
   end
 
-  ALB -->|8080, health checked| ASG
-  ASG -->|HTTPS out| NAT --> NET((Internet:<br/>GitHub, Systems Manager))
-  ASG --> GWE
+  IGW --> ALBA & ALBB
+  ALBA & ALBB -->|8080, health checked| EC2A & EC2B
+  EC2A & EC2B -->|HTTPS out| NAT --> NET((Internet:<br/>GitHub, Systems Manager))
+  EC2A & EC2B --> GWE
   GWE -->|orders| DDB[(DynamoDB orders table<br/>shared by all servers)]
   GWE -->|packages| S3[(Amazon Linux repositories in S3)]
-  CW[CloudWatch: average CPU] -->|above 50%: add<br/>well below: remove| ASG
-  ENG[Engineer with AWS credentials] -->|Systems Manager,<br/>no SSH, no open port| ASG
+  ASG["Auto Scaling group<br/>2 to 6 servers, t3.micro"] -.-> EC2A & EC2B
+  CW[CloudWatch: average CPU] -->|above 50% for 3 min: add<br/>below 40% for 3 min: remove one| ASG
+  ENG[Engineer with AWS credentials] -->|Systems Manager,<br/>no SSH, no open port| EC2A & EC2B
 ```
 
-- **Customers** reach one address: the load balancer. It shares requests across healthy servers.
+- **Customers** reach one address: the load balancer. AWS runs a node of it in each zone's public subnet (drawn separately above), and either node can send requests to healthy servers in both zones.
 - **Servers** sit in private subnets. Nothing on the internet can connect to them. They connect *out* through one Regional NAT Gateway, which serves both zones. Orders (DynamoDB) and packages (S3) go through free gateway endpoints and never leave the AWS network.
 - **The network follows the VPC lab** (`onward-orders` network): public subnets for the load balancer, private subnets for servers, and gateway endpoints. Instead of the VPC lab's NAT gateway per zone, it uses one Regional NAT Gateway, which spans both zones by itself: no Elastic IPs and one private route table.
 - **The Auto Scaling group** keeps between two and six servers running, spread over two zones. It replaces any server that fails its health check.
-- **A scaling policy** watches average CPU. Above 50% it adds servers; when CPU stays low it removes them.
+- **Two scaling rules** watch average CPU. Above 50% for 3 minutes, servers are added; below 40% for 3 minutes, one server is removed at a time.
 - **Each server builds itself** at launch: it downloads this repository and runs `scripts/install.sh`. Nobody logs in.
 - **Every page shows which server answered** (instance ID and zone), so you can watch requests spread as servers come and go.
 - **Orders live in one DynamoDB table** shared by all servers, so an order placed through one server is found by every other, including servers that did not exist when it was placed.
@@ -49,7 +61,7 @@ flowchart TB
 
 | Path | What it is |
 |---|---|
-| `infra/template.yaml` | The whole infrastructure, in seven numbered sections |
+| `infra/template.yaml` | The whole infrastructure, in six numbered sections |
 | `infra/deployments/dev.yaml` | GitSync deployment file: parameters and tags for the `dev` stack |
 | `bootstrap/` | The two templates that switch GitSync on. Deployed once from a terminal |
 | `app/` | The order application (see below) |
@@ -57,7 +69,8 @@ flowchart TB
 | `scripts/load-test.sh` | Simulates a sales day, securely |
 | `tests/` | Application tests |
 | `docs/discovery-report.docx` | Discovery report (Word): the problem, options considered, the business value and the key design decisions |
-| `docs/architecture.png` | Architecture diagram |
+| `docs/architecture.png` | Architecture diagram, exported from Eraser |
+| `docs/architecture.eraser` | Source of the diagram: paste into [Eraser](https://www.eraser.io) to edit and re-export |
 | `docs/cost.md` | What the design costs on a quiet day and on a peak day |
 
 ### Inside `app/`
